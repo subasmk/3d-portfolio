@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Subash MK — Drive My Portfolio</title>
+<meta name="description" content="An interactive 3D portfolio you drive through. Subash Mk — AI & Data Science student, founder of Nientra.">
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html, body { width:100%; height:100%; overflow:hidden; background:#0e1420; font-family:'Segoe UI', system-ui, -apple-system, Arial, sans-serif; }
+  #scene { position:fixed; inset:0; display:block; }
+
+  /* ---------- HUD ---------- */
+  #hud { position:fixed; top:14px; left:16px; z-index:10; color:#fff; pointer-events:none; text-shadow:0 2px 8px rgba(0,0,0,.55); }
+  #hud h1 { font-size:22px; letter-spacing:2px; font-weight:800; }
+  #hud h1 span { color:#ffb020; }
+  #hud p { font-size:12.5px; opacity:.92; margin-top:2px; letter-spacing:.4px; }
+  #speedo { position:fixed; top:14px; right:16px; z-index:10; color:#fff; text-align:right; pointer-events:none; text-shadow:0 2px 8px rgba(0,0,0,.55); }
+  #speedo .v { font-size:30px; font-weight:800; line-height:1; }
+  #speedo .u { font-size:11px; letter-spacing:2px; opacity:.85; }
+  #minimap { position:fixed; right:16px; top:86px; z-index:10; width:118px; height:118px; border-radius:12px; background:rgba(10,16,26,.62); border:1px solid rgba(255,255,255,.25); }
+  #helpbar { position:fixed; left:50%; transform:translateX(-50%); bottom:12px; z-index:10; color:#dfe8f5; background:rgba(10,16,26,.55); border:1px solid rgba(255,255,255,.16); padding:7px 16px; border-radius:999px; font-size:12.5px; letter-spacing:.3px; white-space:nowrap; pointer-events:none; }
+  #helpbar b { color:#ffb020; }
+
+  /* ---------- Zone info card ---------- */
+  #zoneCard { position:fixed; left:50%; bottom:52px; transform:translate(-50%, 24px); z-index:20; width:min(560px, calc(100vw - 28px));
+    background:rgba(13,20,34,.93); color:#eef3fb; border:1px solid rgba(255,255,255,.18); border-top:4px solid #ffb020;
+    border-radius:16px; padding:16px 20px 14px; opacity:0; pointer-events:none; transition:all .28s ease; box-shadow:0 18px 50px rgba(0,0,0,.5);
+    max-height:46vh; overflow-y:auto; }
+  #zoneCard.show { opacity:1; transform:translate(-50%, 0); pointer-events:auto; }
+  #zoneCard h2 { font-size:19px; letter-spacing:1px; margin-bottom:6px; }
+  #zoneCard p, #zoneCard li { font-size:14px; line-height:1.55; color:#cfdae9; }
+  #zoneCard ul { margin:4px 0 2px 18px; }
+  #zoneCard .chips { margin-top:8px; display:flex; flex-wrap:wrap; gap:6px; }
+  #zoneCard .chip { background:#1d2c46; border:1px solid #35507c; color:#bcd2f5; padding:4px 10px; border-radius:999px; font-size:12.5px; }
+  #zoneCard .links { margin-top:10px; display:flex; flex-wrap:wrap; gap:8px; }
+  #zoneCard a.btn { display:inline-block; background:#ffb020; color:#141414; font-weight:700; font-size:13.5px; text-decoration:none; padding:8px 14px; border-radius:10px; }
+  #zoneCard a.btn.ghost { background:transparent; color:#ffb020; border:1.5px solid #ffb020; }
+
+  /* ---------- Start overlay ---------- */
+  #startOverlay { position:fixed; inset:0; z-index:50; display:flex; align-items:center; justify-content:center;
+    background:radial-gradient(ellipse at center, rgba(10,16,28,.25) 0%, rgba(10,16,28,.88) 78%); color:#fff; text-align:center; padding:20px; }
+  #startOverlay .box { max-width:620px; }
+  #startOverlay .kicker { letter-spacing:4px; font-size:12px; color:#ffb020; font-weight:700; }
+  #startOverlay h1 { font-size:clamp(38px, 7vw, 64px); font-weight:900; letter-spacing:1px; margin:8px 0 4px; line-height:1.05; }
+  #startOverlay h1 span { color:#ffb020; }
+  #startOverlay p.sub { font-size:clamp(14px, 2.4vw, 18px); color:#ccd8ea; line-height:1.55; }
+  #startOverlay .controls { margin:20px auto 6px; display:flex; flex-wrap:wrap; gap:8px 18px; justify-content:center; font-size:13.5px; color:#aebdd2; }
+  #startOverlay .controls b { color:#fff; background:#22314e; border:1px solid #3a517a; border-bottom-width:3px; padding:1px 8px; border-radius:6px; font-size:12.5px; }
+  #driveBtn { margin-top:20px; background:#ffb020; color:#141414; border:none; font-size:19px; font-weight:800; letter-spacing:1px;
+    padding:15px 44px; border-radius:999px; cursor:pointer; box-shadow:0 10px 34px rgba(255,176,32,.35); transition:transform .15s ease; }
+  #driveBtn:hover { transform:scale(1.05); }
+  #startOverlay .tiny { margin-top:14px; font-size:12px; color:#8fa1bb; }
+
+  /* ---------- Touch controls ---------- */
+  #touch { position:fixed; inset:auto 0 0 0; z-index:30; display:none; justify-content:space-between; padding:0 14px 64px; pointer-events:none; }
+  #touch .grp { display:flex; gap:12px; pointer-events:auto; }
+  #touch button { width:64px; height:64px; border-radius:50%; border:1.5px solid rgba(255,255,255,.35); background:rgba(13,20,34,.55); color:#fff;
+    font-size:24px; -webkit-tap-highlight-color:transparent; touch-action:none; user-select:none; }
+  #touch button.on { background:rgba(255,176,32,.75); color:#141414; }
+  @media (hover:none) and (pointer:coarse) { #touch { display:flex; } #helpbar { display:none; } }
+</style>
+</head>
+<body>
+
+<canvas id="scene"></canvas>
+
+<div id="hud">
+  <h1>SUBASH <span>MK</span></h1>
+  <p>Drive around to explore my portfolio</p>
+</div>
+<div id="speedo"><div class="v" id="speedVal">0</div><div class="u">KM/H</div></div>
+<canvas id="minimap" width="118" height="118"></canvas>
+<div id="helpbar"><b>W A S D</b> drive &nbsp;·&nbsp; <b>SHIFT</b> boost &nbsp;·&nbsp; <b>SPACE</b> brake &nbsp;·&nbsp; <b>R</b> reset &nbsp;·&nbsp; <b>H</b> horn</div>
+
+<div id="zoneCard"></div>
+
+<div id="touch">
+  <div class="grp">
+    <button id="tLeft">&#9664;</button>
+    <button id="tRight">&#9654;</button>
+  </div>
+  <div class="grp">
+    <button id="tBrake">&#9660;</button>
+    <button id="tGas">&#9650;</button>
+  </div>
+</div>
+
+<div id="startOverlay">
+  <div class="box">
+    <div class="kicker">INTERACTIVE 3D PORTFOLIO</div>
+    <h1>SUBASH <span>MK</span></h1>
+    <p class="sub">AI &amp; Data Science student · Founder of <b>Nientra</b><br>Don't read my portfolio. <b>Drive it.</b></p>
+    <div class="controls">
+      <span><b>W A S D</b> Drive</span><span><b>SHIFT</b> Boost</span><span><b>SPACE</b> Brake</span><span><b>R</b> Reset</span>
+    </div>
+    <button id="driveBtn">START DRIVING</button>
+    <p class="tiny">Drive into a coloured zone to open it · Works on mobile too</p>
+  </div>
+</div>
+
+<script type="importmap">
+{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js" } }
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+
+/* ============================================================ RENDERER / SCENE */
+const canvas = document.getElementById('scene');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias:true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x87b5d9);
+scene.fog = new THREE.Fog(0x87b5d9, 90, 210);
+
+const camera = new THREE.PerspectiveCamera(62, window.innerWidth/window.innerHeight, 0.1, 500);
+
+const hemi = new THREE.HemisphereLight(0xcfe8ff, 0x4a6b46, 0.95);
+scene.add(hemi);
+const sun = new THREE.DirectionalLight(0xfff2d8, 1.6);
+sun.position.set(60, 90, 40);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.camera.left = -120; sun.shadow.camera.right = 120;
+sun.shadow.camera.top = 120; sun.shadow.camera.bottom = -120;
+scene.add(sun);
+
+/* ============================================================ HELPERS */
+const colliders = []; // {minX,maxX,minZ,maxZ}
+function addCollider(cx, cz, w, d){ colliders.push({ minX:cx-w/2, maxX:cx+w/2, minZ:cz-d/2, maxZ:cz+d/2 }); }
+
+function labelTexture(text, bg, fg){
+  const c = document.createElement('canvas'); c.width = 1024; c.height = 320;
+  const g = c.getContext('2d');
+  g.fillStyle = bg; g.fillRect(0,0,1024,320);
+  g.strokeStyle = 'rgba(255,255,255,0.85)'; g.lineWidth = 14; g.strokeRect(14,14,996,292);
+  g.fillStyle = fg; g.font = '900 118px Arial, sans-serif';
+  g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.fillText(text, 512, 168);
+  const t = new THREE.CanvasTexture(c); t.anisotropy = 4; return t;
+}
+function floatingText(text, color){
+  const c = document.createElement('canvas'); c.width = 1024; c.height = 256;
+  const g = c.getContext('2d');
+  g.font = '900 130px Arial, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.lineWidth = 22; g.strokeStyle = 'rgba(10,16,26,0.9)'; g.strokeText(text, 512, 132);
+  g.fillStyle = color; g.fillText(text, 512, 132);
+  const t = new THREE.CanvasTexture(c);
+  const m = new THREE.SpriteMaterial({ map:t, transparent:true, depthWrite:false });
+  const s = new THREE.Sprite(m); s.scale.set(17, 4.25, 1); return s;
+}
+
+/* ============================================================ WORLD */
+const WORLD = 108; // half-extent of ground
+
+// ground (grass)
+const ground = new THREE.Mesh(
+  new THREE.PlaneGeometry(WORLD*2, WORLD*2),
+  new THREE.MeshLambertMaterial({ color:0x6fae5e })
+);
+ground.rotation.x = -Math.PI/2; ground.receiveShadow = true; scene.add(ground);
+
+// roads (cross through the middle + ring)
+const roadMat = new THREE.MeshLambertMaterial({ color:0x3c4249 });
+function road(w, d, x, z){
+  const r = new THREE.Mesh(new THREE.PlaneGeometry(w, d), roadMat);
+  r.rotation.x = -Math.PI/2; r.position.set(x, 0.02, z); r.receiveShadow = true; scene.add(r);
+}
+road(WORLD*2, 13, 0, 0); road(13, WORLD*2, 0, 0);
+// centre plaza
+const plaza = new THREE.Mesh(new THREE.CircleGeometry(13, 40), new THREE.MeshLambertMaterial({ color:0x8d949c }));
+plaza.rotation.x = -Math.PI/2; plaza.position.y = 0.03; plaza.receiveShadow = true; scene.add(plaza);
+
+// world border (hedge walls)
+const hedgeMat = new THREE.MeshLambertMaterial({ color:0x2e6b34 });
+[[0,-WORLD,WORLD*2+4,3],[0,WORLD,WORLD*2+4,3],[-WORLD,0,3,WORLD*2+4],[WORLD,0,3,WORLD*2+4]].forEach(([x,z,w,d])=>{
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w, 3.4, d), hedgeMat);
+  m.position.set(x, 1.7, z); m.castShadow = true; scene.add(m);
+});
+
+// decorative buildings (deterministic pseudo-random)
+const palette = [0xf2e3c6, 0xdfe7ee, 0xf6cfa8, 0xcfe0c3, 0xe8c8d8, 0xbfd4e6, 0xf3efdf, 0xd9c7e7];
+let seed = 42; const rnd = ()=>{ seed = (seed*1664525 + 1013904223) % 4294967296; return seed/4294967296; };
+const zonePts = [[0,-58],[55,-18],[34,47],[-34,47],[-55,-18]];
+let placed = 0, guard = 0;
+while (placed < 30 && guard++ < 400){
+  const x = (rnd()*2-1) * (WORLD-14), z = (rnd()*2-1) * (WORLD-14);
+  if (Math.abs(x) < 13 || Math.abs(z) < 13) continue;              // keep roads clear
+  if (Math.hypot(x, z) < 20) continue;                              // keep plaza clear
+  if (zonePts.some(([zx,zz])=> Math.hypot(x-zx, z-zz) < 17)) continue;
+  const w = 7 + rnd()*6, d = 7 + rnd()*6, hgt = 6 + rnd()*16;
+  const b = new THREE.Mesh(new THREE.BoxGeometry(w, hgt, d),
+    new THREE.MeshLambertMaterial({ color: palette[Math.floor(rnd()*palette.length)] }));
+  b.position.set(x, hgt/2, z); b.castShadow = true; b.receiveShadow = true; scene.add(b);
+  const roof = new THREE.Mesh(new THREE.BoxGeometry(w+0.6, 0.7, d+0.6),
+    new THREE.MeshLambertMaterial({ color:0x5a4632 }));
+  roof.position.set(x, hgt+0.35, z); roof.castShadow = true; scene.add(roof);
+  addCollider(x, z, w+0.4, d+0.4);
+  placed++;
+}
+// trees
+const trunkMat = new THREE.MeshLambertMaterial({ color:0x6b4a2b });
+const leafMat = new THREE.MeshLambertMaterial({ color:0x2f7d38 });
+for (let i=0; i<46; i++){
+  const x = (rnd()*2-1) * (WORLD-8), z = (rnd()*2-1) * (WORLD-8);
+  if (Math.abs(x) < 10 || Math.abs(z) < 10) continue;
+  if (Math.hypot(x, z) < 17) continue;
+  if (zonePts.some(([zx,zz])=> Math.hypot(x-zx, z-zz) < 13)) continue;
+  const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.42, 2.4, 6), trunkMat);
+  trunk.position.set(x, 1.2, z); trunk.castShadow = true; scene.add(trunk);
+  const leaf = new THREE.Mesh(new THREE.ConeGeometry(2.1, 4.6, 8), leafMat);
+  leaf.position.set(x, 4.6, z); leaf.castShadow = true; scene.add(leaf);
+  addCollider(x, z, 0.9, 0.9);
+}
+
+/* ============================================================ ZONES */
+const ZONES = [
+  { id:'about', name:'ABOUT ME', color:'#ffb020', colorHex:0xffb020, x:0, z:-58,
+    html:`<h2>ABOUT ME</h2>
+      <p><b>Subash Mk</b>, 19 — B.Tech <b>Artificial Intelligence &amp; Data Science</b> student at
+      VSB College of Engineering Technical Campus, Coimbatore.</p>
+      <p>I learn by <b>building in public</b> — AI products, full-stack apps and playful experiments
+      that people can actually use. Founder of <b>Nientra</b>: "Work less. Win more."</p>` },
+  { id:'projects', name:'PROJECTS', color:'#38b6ff', colorHex:0x38b6ff, x:55, z:-18,
+    html:`<h2>PROJECTS</h2>
+      <ul>
+        <li><b>Shiba Desktop (Rex)</b> — AI desktop pet with voice, wake word &amp; a local brain. Shipped as real Windows builds.</li>
+        <li><b>Nuketown / Gesture Clash</b> — 3D arena you play with hand gestures on a webcam. Live online.</li>
+        <li><b>Valorant Gesture Control</b> — play an FPS with hand gestures instead of a mouse.</li>
+        <li><b>Nientra</b> — my startup: websites &amp; AI automation for local businesses.</li>
+      </ul>
+      <div class="links"><a class="btn" href="https://github.com/subasmk" target="_blank" rel="noopener">GitHub — subasmk</a></div>` },
+  { id:'skills', name:'SKILLS', color:'#7ee081', colorHex:0x7ee081, x:-55, z:-18,
+    html:`<h2>SKILLS</h2>
+      <p>What I build with, day to day:</p>
+      <div class="chips">
+        <span class="chip">Python</span><span class="chip">Java</span><span class="chip">React</span>
+        <span class="chip">JavaScript</span><span class="chip">MySQL</span><span class="chip">Three.js</span>
+        <span class="chip">Electron</span><span class="chip">Git &amp; GitHub</span><span class="chip">AI / ML</span>
+      </div>
+      <p style="margin-top:8px">Strongest in: AI products, full-stack development, and turning rough ideas into shipped, working software — fast.</p>` },
+  { id:'nientra', name:'NIENTRA', color:'#ff5d5d', colorHex:0xff5d5d, x:-34, z:47,
+    html:`<h2>NIENTRA — WORK LESS. WIN MORE.</h2>
+      <p>My startup. I build digital leverage for local businesses:</p>
+      <ul>
+        <li><b>Business websites</b> — from &#8377;4,999</li>
+        <li><b>AI chat assistant</b> for your business — from &#8377;7,999</li>
+        <li><b>Automation</b> for repetitive work — from &#8377;2,999</li>
+        <li><b>&#8377;999 pilot</b> — start small, see it work, then scale</li>
+      </ul>
+      <div class="links"><a class="btn" href="https://nientra.xyz" target="_blank" rel="noopener">nientra.xyz</a></div>` },
+  { id:'contact', name:'CONTACT', color:'#c792ff', colorHex:0xc792ff, x:34, z:47,
+    html:`<h2>CONTACT</h2>
+      <p>Fastest way to reach me is WhatsApp — I reply fast.</p>
+      <div class="links">
+        <a class="btn" href="https://wa.me/918778149499?text=Hi%20Subash%2C%20I%20drove%20through%20your%203D%20portfolio!" target="_blank" rel="noopener">WhatsApp Me</a>
+        <a class="btn ghost" href="mailto:mksubash2809@gmail.com">Email</a>
+        <a class="btn ghost" href="https://subashmk.xyz" target="_blank" rel="noopener">subashmk.xyz</a>
+        <a class="btn ghost" href="https://github.com/subasmk" target="_blank" rel="noopener">GitHub</a>
+      </div>
+      <p style="margin-top:8px">Coimbatore, India · Open to internships, freelance &amp; collaborations.</p>` },
+];
+
+const zoneMeshes = [];
+ZONES.forEach(zn=>{
+  // glowing pad
+  const pad = new THREE.Mesh(new THREE.CircleGeometry(9, 36),
+    new THREE.MeshBasicMaterial({ color: zn.colorHex, transparent:true, opacity:0.4 }));
+  pad.rotation.x = -Math.PI/2; pad.position.set(zn.x, 0.06, zn.z); scene.add(pad);
+  const ring = new THREE.Mesh(new THREE.RingGeometry(8.6, 9.3, 36),
+    new THREE.MeshBasicMaterial({ color: zn.colorHex }));
+  ring.rotation.x = -Math.PI/2; ring.position.set(zn.x, 0.07, zn.z); scene.add(ring);
+  // sign board on two posts
+  const sign = new THREE.Mesh(new THREE.BoxGeometry(11, 3.4, 0.4),
+    new THREE.MeshLambertMaterial({ map: labelTexture(zn.name, zn.color, '#10151f') }));
+  const dirToCentre = Math.atan2(-zn.x, -zn.z);
+  sign.position.set(zn.x, 4.6, zn.z); sign.rotation.y = dirToCentre; sign.castShadow = true; scene.add(sign);
+  const postGeo = new THREE.CylinderGeometry(0.22, 0.22, 3.4, 6);
+  const postMat = new THREE.MeshLambertMaterial({ color:0x333a42 });
+  [-3.6, 3.6].forEach(off=>{
+    const post = new THREE.Mesh(postGeo, postMat);
+    post.position.set(zn.x + Math.cos(dirToCentre)*off, 1.7, zn.z - Math.sin(dirToCentre)*off);
+    post.castShadow = true; scene.add(post);
+  });
+  // floating label
+  const fl = floatingText(zn.name, zn.color);
+  fl.position.set(zn.x, 9.2, zn.z); scene.add(fl);
+  zn.pad = pad; zn.ring = ring;
+  zoneMeshes.push(zn);
+});
+
+// centre welcome sign
+const welcome = new THREE.Mesh(new THREE.BoxGeometry(13, 3.8, 0.4),
+  new THREE.MeshLambertMaterial({ map: labelTexture('SUBASH MK', '#ffb020', '#10151f') }));
+welcome.position.set(0, 5.2, -11); welcome.castShadow = true; scene.add(welcome);
+[[-4.4],[4.4]].forEach(([off])=>{
+  const post = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.24, 4.2, 6),
+    new THREE.MeshLambertMaterial({ color:0x333a42 }));
+  post.position.set(off, 2.1, -11); scene.add(post);
+});
+
+/* ============================================================ CAR */
+const car = new THREE.Group();
+const bodyMat = new THREE.MeshStandardMaterial({ color:0xffb020, metalness:0.35, roughness:0.4 });
+const body = new THREE.Mesh(new THREE.BoxGeometry(2.1, 0.62, 4.1), bodyMat);
+body.position.y = 0.62; body.castShadow = true; car.add(body);
+const cabin = new THREE.Mesh(new THREE.BoxGeometry(1.75, 0.58, 2.0),
+  new THREE.MeshStandardMaterial({ color:0x18222f, metalness:0.4, roughness:0.25 }));
+cabin.position.set(0, 1.18, -0.25); cabin.castShadow = true; car.add(cabin);
+const stripe = new THREE.Mesh(new THREE.BoxGeometry(2.16, 0.16, 4.16),
+  new THREE.MeshStandardMaterial({ color:0x141414, roughness:0.6 }));
+stripe.position.y = 0.42; car.add(stripe);
+const wheelGeo = new THREE.CylinderGeometry(0.42, 0.42, 0.34, 14);
+const wheelMat = new THREE.MeshStandardMaterial({ color:0x15181c, roughness:0.9 });
+function mkWheel(x, z){
+  const w = new THREE.Mesh(wheelGeo, wheelMat);
+  w.rotation.z = Math.PI/2; w.position.set(x, 0.42, z); w.castShadow = true; car.add(w); return w;
+}
+const wFL = mkWheel(-1.08, 1.35), wFR = mkWheel(1.08, 1.35), wRL = mkWheel(-1.08, -1.35), wRR = mkWheel(1.08, -1.35);
+// headlights
+[-0.68, 0.68].forEach(x=>{
+  const hl = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.18, 0.08),
+    new THREE.MeshBasicMaterial({ color:0xfff6c9 }));
+  hl.position.set(x, 0.68, 2.06); car.add(hl);
+});
+scene.add(car);
+
+/* car state */
+const carState = { x:0, z:14, heading: Math.PI, speed:0 }; // heading PI faces -Z (north, toward welcome sign)
+let vy = 0, yOff = 0; // jump physics
+
+/* ============================================================ INPUT */
+const keys = {};
+let started = false;
+window.addEventListener('keydown', e=>{
+  keys[e.code] = true;
+  if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space'].includes(e.code)) e.preventDefault();
+  if (e.code === 'KeyR') resetCar();
+  if (e.code === 'KeyH') honk();
+});
+window.addEventListener('keyup', e=>{ keys[e.code] = false; });
+
+function bindTouch(id, code){
+  const el = document.getElementById(id);
+  const on = e=>{ e.preventDefault(); keys[code] = true; el.classList.add('on'); if(!started) startDriving(); };
+  const off = e=>{ e.preventDefault(); keys[code] = false; el.classList.remove('on'); };
+  el.addEventListener('pointerdown', on);
+  el.addEventListener('pointerup', off);
+  el.addEventListener('pointerleave', off);
+  el.addEventListener('pointercancel', off);
+}
+bindTouch('tGas', 'KeyW'); bindTouch('tBrake', 'KeyS');
+bindTouch('tLeft', 'KeyA'); bindTouch('tRight', 'KeyD');
+
+function resetCar(){ carState.x = 0; carState.z = 14; carState.heading = Math.PI; carState.speed = 0; yOff = 0; vy = 0; }
+
+let audioCtx = null;
+function honk(){
+  if (!started) return;
+  try {
+    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+    o.type = 'square'; o.frequency.value = 370;
+    g.gain.setValueAtTime(0.12, audioCtx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.28);
+    o.connect(g); g.connect(audioCtx.destination);
+    o.start(); o.stop(audioCtx.currentTime + 0.3);
+  } catch(e) {}
+}
+
+/* jump */
+window.addEventListener('keydown', e=>{
+  if (e.code === 'Space' && started && yOff === 0 && !(keys['KeyS'])) { /* space is brake; jump on KeyJ below */ }
+  if (e.code === 'KeyJ' && yOff === 0) vy = 8.5;
+});
+
+/* ============================================================ ZONE CARD */
+const card = document.getElementById('zoneCard');
+let currentZone = null;
+function checkZones(){
+  let found = null;
+  for (const zn of ZONES){
+    if (Math.hypot(carState.x - zn.x, carState.z - zn.z) < 10.5) { found = zn; break; }
+  }
+  if (found !== currentZone){
+    currentZone = found;
+    if (found){ card.innerHTML = found.html; card.style.borderTopColor = found.color; card.classList.add('show'); }
+    else card.classList.remove('show');
+  }
+}
+
+/* ============================================================ MINIMAP */
+const mm = document.getElementById('minimap').getContext('2d');
+function drawMinimap(){
+  mm.clearRect(0,0,118,118);
+  mm.fillStyle = 'rgba(70,120,70,0.85)'; mm.fillRect(0,0,118,118);
+  mm.fillStyle = '#3c4249';
+  mm.fillRect(0, 55, 118, 8); mm.fillRect(55, 0, 8, 118);
+  const toMap = (x,z)=>[ (x+WORLD)/(WORLD*2)*118, (z+WORLD)/(WORLD*2)*118 ];
+  for (const zn of ZONES){
+    const [mx,my] = toMap(zn.x, zn.z);
+    mm.fillStyle = zn.color; mm.beginPath(); mm.arc(mx, my, 5.5, 0, 7); mm.fill();
+  }
+  const [cx, cy] = toMap(carState.x, carState.z);
+  mm.save(); mm.translate(cx, cy); mm.rotate(Math.PI - carState.heading);
+  mm.fillStyle = '#ffffff';
+  mm.beginPath(); mm.moveTo(0,-6); mm.lineTo(4,5); mm.lineTo(-4,5); mm.closePath(); mm.fill();
+  mm.restore();
+}
+
+/* ============================================================ MAIN LOOP */
+const clock = new THREE.Clock();
+const camPos = new THREE.Vector3(0, 6, 26);
+const speedEl = document.getElementById('speedVal');
+
+function step(){
+  requestAnimationFrame(step);
+  const dt = Math.min(clock.getDelta(), 0.05);
+  const t = clock.elapsedTime;
+
+  if (started){
+    const boost = (keys['ShiftLeft'] || keys['ShiftRight']) ? 1.7 : 1;
+    const maxF = 27 * boost, maxR = -11;
+    if (keys['KeyW'] || keys['ArrowUp']) carState.speed += 34 * dt;
+    else if (keys['KeyS'] || keys['ArrowDown']) carState.speed -= 30 * dt;
+    else carState.speed -= carState.speed * 1.4 * dt; // engine drag / rolling friction
+    if (keys['Space']) carState.speed -= carState.speed * 5.5 * dt; // brake
+    carState.speed = THREE.MathUtils.clamp(carState.speed, maxR, maxF);
+    if (Math.abs(carState.speed) < 0.02 && !keys['KeyW'] && !keys['KeyS']) carState.speed = 0;
+
+    let steer = 0;
+    if (keys['KeyA'] || keys['ArrowLeft']) steer += 1;
+    if (keys['KeyD'] || keys['ArrowRight']) steer -= 1;
+    if (steer !== 0 && carState.speed !== 0){
+      carState.heading += steer * 1.85 * dt * (carState.speed / 27);
+    }
+    // note: heading 0 faces +Z; forward vector:
+    const fx = Math.sin(carState.heading), fz = Math.cos(carState.heading);
+    carState.x += fx * carState.speed * dt;
+    carState.z += fz * carState.speed * dt;
+
+    // world bounds
+    const B = WORLD - 3;
+    if (carState.x >  B) { carState.x =  B; carState.speed *= 0.35; }
+    if (carState.x < -B) { carState.x = -B; carState.speed *= 0.35; }
+    if (carState.z >  B) { carState.z =  B; carState.speed *= 0.35; }
+    if (carState.z < -B) { carState.z = -B; carState.speed *= 0.35; }
+
+    // building collisions (circle vs AABB)
+    const R = 1.7;
+    for (const c of colliders){
+      const nx = Math.max(c.minX, Math.min(carState.x, c.maxX));
+      const nz = Math.max(c.minZ, Math.min(carState.z, c.maxZ));
+      const dx = carState.x - nx, dz = carState.z - nz;
+      const d2 = dx*dx + dz*dz;
+      if (d2 < R*R){
+        if (d2 > 0.0001){
+          const d = Math.sqrt(d2);
+          carState.x = nx + dx/d * R; carState.z = nz + dz/d * R;
+        } else {
+          carState.z = c.minZ - R;
+        }
+        carState.speed *= 0.3;
+      }
+    }
+
+    // jump physics (KeyJ)
+    if (yOff > 0 || vy !== 0){
+      vy -= 26 * dt; yOff += vy * dt;
+      if (yOff <= 0){ yOff = 0; vy = 0; }
+    }
+
+    // wheels + steering visuals
+    const spin = carState.speed * dt / 0.42;
+    [wFL, wFR, wRL, wRR].forEach(w=> w.rotation.x += spin);
+    const targetYaw = steer * 0.42;
+    wFL.rotation.y += (targetYaw - wFL.rotation.y) * 0.4;
+    wFR.rotation.y = wFL.rotation.y;
+
+    checkZones();
+  }
+
+  // idle pulse on zone pads
+  for (const zn of ZONES){
+    const s = 1 + Math.sin(t*2.2 + zn.x) * 0.03;
+    zn.pad.material.opacity = 0.32 + Math.sin(t*2.2 + zn.x) * 0.1;
+    zn.ring.scale.set(s, s, 1);
+  }
+
+  // place car
+  car.position.set(carState.x, yOff, carState.z);
+  car.rotation.y = carState.heading;
+
+  // chase camera
+  const fx = Math.sin(carState.heading), fz = Math.cos(carState.heading);
+  const desired = new THREE.Vector3(
+    carState.x - fx * 10.5, 5.4 + Math.abs(carState.speed) * 0.02, carState.z - fz * 10.5);
+  camPos.lerp(desired, started ? 0.055 : 0.02);
+  camera.position.copy(camPos);
+  camera.lookAt(carState.x + fx * 5, 1.2, carState.z + fz * 5);
+
+  speedEl.textContent = Math.round(Math.abs(carState.speed) * 3.6);
+  drawMinimap();
+  renderer.render(scene, camera);
+}
+step();
+
+/* ============================================================ START / RESIZE */
+function startDriving(){
+  if (started) return;
+  started = true;
+  document.getElementById('startOverlay').style.display = 'none';
+}
+document.getElementById('driveBtn').addEventListener('click', startDriving);
+canvas.addEventListener('pointerdown', ()=>{ if (!started) return; });
+
+window.addEventListener('resize', ()=>{
+  camera.aspect = window.innerWidth/window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+</script>
+</body>
+</html>
